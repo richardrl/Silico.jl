@@ -1,3 +1,7 @@
+using Silico
+using Mehrotra
+using Colors
+
 ################################################################################
 # visualization
 ################################################################################
@@ -57,8 +61,8 @@ z0 = [x2; v15]
 
 Silico.set_gravity!(mech, gravity)
 Mehrotra.initialize_solver!(mech.solver)
-@elapsed storage = simulate!(mech, deepcopy(z0), H)
-vis, anim = visualize!(vis, mech, storage, name=:single, color=RGBA(1,1,1,0.8))
+@elapsed storage = Silico.simulate!(mech, deepcopy(z0), H)
+vis, anim = Silico.visualize!(vis, mech, storage, name=:single, color=RGBA(1,1,1,0.8))
 
 storage.z[end]
 
@@ -88,9 +92,9 @@ goal = [0.0, 0.25, 0.0, 0.0, 0.0, 0.0]
 
 # ## model
 dyn = IterativeLQR.Dynamics(
-    (y, z, u, w) -> dynamics(y, mech, z, u),
-    (dz, z, u, w) -> dynamics_jacobian_state(dz, mech, z, u),
-    (du, z, u, w) -> dynamics_jacobian_input(du, mech, z, u),
+    (y, z, u, w) -> Silico.dynamics(y, mech, z, u),
+    (dz, z, u, w) -> Silico.dynamics_jacobian_state(dz, mech, z, u),
+    (du, z, u, w) -> Silico.dynamics_jacobian_input(du, mech, z, u),
     n, n, m)
 
 model = [dyn for t = 1:T-1]
@@ -100,12 +104,12 @@ model = [dyn for t = 1:T-1]
 ū = [0.1 * randn(m) for t = 1:T-1]
 
 z̄ = IterativeLQR.rollout(model, z0, ū)
-visualize!(vis, mech, z̄)
+Silico.visualize!(vis, mech, z̄)
 
 # ## objective
 ############################################################################
-ots = [(z, u) -> transpose(z - goal) * Diagonal([0.0, 0.0, 1.0e-1, 1.0, 1.0, 1.0]) * (z - goal) + transpose(u) * Diagonal([1.0e-3, 1.0e-3, 1.0e-3]) * u for t = 1:T-1]
-oT = (z, u) -> transpose(z - goal) * Diagonal(0.0 * [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]) * (z - goal)
+ots = [(z, u) -> transpose(z - goal) * Silico.Diagonal([0.0, 0.0, 1.0e-1, 1.0, 1.0, 1.0]) * (z - goal) + transpose(u) * Silico.Diagonal([1.0e-3, 1.0e-3, 1.0e-3]) * u for t = 1:T-1]
+oT = (z, u) -> transpose(z - goal) * Silico.Diagonal(0.0 * [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]) * (z - goal)
 
 
 cts = [IterativeLQR.Cost(ot, n, m) for ot in ots]
@@ -147,7 +151,7 @@ IterativeLQR.initialize_states!(s, z̄)
 
 # ## solve
 # local_callback!(solver::IterativeLQR.Solver) = continuation_callback!(solver, mech, visualize=true)
-reset!(mech, residual_tolerance=1e-6, complementarity_tolerance=1e-3)
+Silico.reset!(mech, residual_tolerance=1e-6, complementarity_tolerance=1e-3)
 @time IterativeLQR.constrained_ilqr_solve!(s)
 
 # ## solution
@@ -156,4 +160,4 @@ z_sol, u_sol = IterativeLQR.get_trajectory(s)
 z_sol[end]
 # ## visualize
 z_view = [[z_sol[1] for t = 1:15]..., z_sol..., [z_sol[end] for t = 1:15]...]
-visualize!(vis, mech, z_view)
+Silico.visualize!(vis, mech, z_view)
